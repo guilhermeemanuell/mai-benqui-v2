@@ -112,6 +112,8 @@
     .btn.outline:hover { background: var(--accent); }
     .btn.danger { background: var(--destructive); color: var(--destructive-foreground); }
     .btn.danger:hover { background: color-mix(in oklab, var(--destructive) 90%, transparent); }
+    #addBtn { background: var(--balance); color: var(--balance-foreground); }
+    #addBtn:hover { background: color-mix(in oklab, var(--balance) 88%, black); }
     .btn.sm { height: 2rem; padding: 0 .75rem; font-size: .75rem; }
     .btn.icon { width: 2.25rem; padding: 0; }
     .btn.lg { height: 3rem; width: 100%; font-size: 1rem; }
@@ -205,10 +207,6 @@
     .cat-list li.std { padding: .75rem 0; }
     .cat-list li span:first-child { min-width: 0; overflow-wrap: break-word; }
     .cat-list .tag { font-size: .75rem; color: var(--muted-foreground); flex-shrink: 0; }
-    .avatar-row { display: flex; align-items: center; gap: .75rem; border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem; }
-    .avatar-row .pic { width: 2.75rem; height: 2.75rem; border-radius: .5rem; background: var(--muted); object-fit: cover; flex-shrink: 0; }
-    .avatar-row .tx-col { flex: 1; min-width: 0; font-size: .875rem; }
-
     #toasts { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: .5rem; align-items: center; width: calc(100% - 2rem); max-width: 22rem; pointer-events: none; }
     .toast { width: 100%; padding: .75rem 1rem; border-radius: .5rem; font-size: .875rem; border: 1px solid; box-shadow: 0 4px 12px rgb(0 0 0 / .12); }
     .toast.ok { background: #f2fbd9; color: #3d5200; border-color: #d8ee9b; }
@@ -220,7 +218,7 @@
     <div class="wrap">
       <header class="hdr">
         <div class="brand">
-          <img id="avatarImg" src="icons/icon-192.png" alt="Ícone do Guig´s Bank" width="56" height="56" />
+          <img src="icons/icon-192.png" alt="Ícone do Guig´s Bank" width="56" height="56" />
           <div style="min-width:0">
             <h1>Guig´s Bank</h1>
             <p>Gaste menos, por favor</p>
@@ -309,12 +307,6 @@
         <div class="err hidden" id="syncErr" role="alert" style="margin-top:.25rem"></div>
       </div>
       <p class="err hidden" id="syncPublic" role="alert" style="margin-top:.75rem"></p>
-      <div class="avatar-row" style="margin-top:1rem">
-        <img class="pic" id="avatarPreview" alt="" />
-        <div class="tx-col"><div style="font-weight:500">Foto do app</div><div class="hint">Fica só no seu repositório privado. Aparece no app e no ícone da aba do navegador.</div></div>
-        <button type="button" class="btn outline sm" id="avatarBtn">Trocar</button>
-        <input type="file" id="avatarFile" accept="image/*" class="hidden" />
-      </div>
       <div class="btns" style="margin-top:1rem">
         <button type="button" class="btn" id="syncNowBtn"></button>
         <button type="button" class="btn outline" id="disconnectBtn" style="flex:0 0 auto">Desconectar</button>

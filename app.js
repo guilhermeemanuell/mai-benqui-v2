@@ -6,9 +6,8 @@
   // ======================================================================
   // Constantes e utilitários
   // ======================================================================
-  var KEYS = { doc: "guigsbank.doc.v2", legacy: "finapp.transactions.v1", cfg: "guigsbank.sync.v1", avatar: "guigsbank.avatar.v1" };
+  var KEYS = { doc: "guigsbank.doc.v2", legacy: "finapp.transactions.v1", cfg: "guigsbank.sync.v1" };
   var DATA_FILE = "guigs-bank.json";
-  var AVATAR_FILE = "avatar.png";
   var API = "https://api.github.com";
   var CATEGORIES = {
     income: ["Salário", "Freelance", "Investimentos", "Presente", "Outros"],
@@ -238,7 +237,7 @@
   // ======================================================================
   // Estado
   // ======================================================================
-  var state = { doc: emptyDoc(), config: null, status: "off", lastSync: null, error: null, avatar: null };
+  var state = { doc: emptyDoc(), config: null, status: "off", lastSync: null, error: null };
   var formType = "expense";
   var listMonth = monthKey(new Date());
   var chartMonth = listMonth;
@@ -361,28 +360,6 @@
     return ghRequest(cfg, "/repos/" + cfg.repo + "/contents/" + DATA_FILE, { method: "PUT", body: JSON.stringify(body) })
       .then(function (res) { if (!res.ok) throw failure(res); });
   }
-  function readAvatar(cfg) {
-    return ghRequest(cfg, "/repos/" + cfg.repo + "/contents/" + AVATAR_FILE).then(function (res) {
-      if (res.status === 404) return null;
-      if (!res.ok) throw failure(res);
-      return res.json().then(function (b) {
-        return b.content && b.encoding === "base64" ? "data:image/png;base64," + b.content.replace(/\s/g, "") : null;
-      });
-    });
-  }
-  function writeAvatar(cfg, dataUrl) {
-    var content = dataUrl.replace(/^data:image\/png;base64,/, "");
-    return ghRequest(cfg, "/repos/" + cfg.repo + "/contents/" + AVATAR_FILE).then(function (cur) {
-      if (cur.ok) return cur.json().then(function (b) { return b.sha; });
-      if (cur.status !== 404) throw failure(cur);
-      return undefined;
-    }).then(function (sha) {
-      var body = { message: "Foto do Guig´s Bank", content: content };
-      if (sha) body.sha = sha;
-      return ghRequest(cfg, "/repos/" + cfg.repo + "/contents/" + AVATAR_FILE, { method: "PUT", body: JSON.stringify(body) });
-    }).then(function (res) { if (!res.ok) throw failure(res); });
-  }
-
   // ======================================================================
   // Sincronização
   // ======================================================================
@@ -433,16 +410,6 @@
     });
   }
 
-  function cacheAvatar(avatar) {
-    setState({ avatar: avatar });
-    if (avatar) lsSet(KEYS.avatar, avatar); else lsDel(KEYS.avatar);
-  }
-  function refreshAvatar() {
-    var cfg = state.config;
-    if (!cfg || !navigator.onLine) return Promise.resolve();
-    return readAvatar(cfg).then(function (a) { if (a) cacheAvatar(a); }, function () { /* a foto é opcional */ });
-  }
-
   function connect(repoInput, tokenInput) {
     var repo = parseRepo(repoInput), token = String(tokenInput).trim();
     if (!repo) return Promise.reject(new Error("Informe o repositório no formato usuario/repositorio"));
@@ -452,13 +419,12 @@
       if (!info.canPush) throw new Error("A chave não tem permissão de escrita (Contents: Read and write) neste repositório");
       if (!lsSet(KEYS.cfg, JSON.stringify(cfg))) throw new Error("Não foi possível guardar a chave neste aparelho");
       setState({ config: cfg, status: "idle", error: null });
-      return syncNow().then(function () { refreshAvatar(); return { isPrivate: info.isPrivate }; });
+      return syncNow().then(function () { return { isPrivate: info.isPrivate }; });
     });
   }
   function disconnect() {
     clearTimeout(timer);
     lsDel(KEYS.cfg);
-    cacheAvatar(null);
     setState({ config: null, status: "off", error: null, lastSync: null });
   }
 
@@ -478,9 +444,9 @@
   // ======================================================================
   // Desenho da tela
   // ======================================================================
-  function renderBalance(income, expense) {
+  function renderBalance(income, expense, month) {
     $("balance").innerHTML =
-      '<div class="lbl">' + svg("wallet") + "Saldo atual</div>" +
+      '<div class="lbl">' + svg("wallet") + "Saldo de " + esc(monthLabel(month)) + "</div>" +
       '<div class="total tnum wrap-any">' + brl(income - expense) + "</div>" +
       '<div class="stats">' +
         '<div class="stat"><div class="lbl" style="display:flex;align-items:center;gap:.5rem;color:var(--balance-muted)"><span class="inc" style="display:grid;place-items:center">' + svg("up") + "</span>Receitas</div>" +
@@ -575,35 +541,25 @@
       $("syncErr").classList.toggle("hidden", !state.error);
       $("syncNowBtn").innerHTML = svg("refresh", state.status === "syncing" ? "spin" : "") + " Sincronizar agora";
       $("syncNowBtn").disabled = state.status === "syncing";
-      $("avatarPreview").src = state.avatar || "icons/icon-192.png";
     }
   }
 
   function render() {
-    var income = 0, expense = 0;
-    state.doc.transactions.forEach(function (t) { if (t.type === "income") income += t.amount; else expense += t.amount; });
     var bounds = monthBounds(state.doc.transactions);
     listMonth = clampMonth(listMonth, bounds);
     chartMonth = clampMonth(chartMonth, bounds);
-    renderBalance(income, expense);
+    // Saldo, receitas e despesas do cartão seguem o mês exibido em "Transações recentes".
+    var income = 0, expense = 0;
+    state.doc.transactions.forEach(function (t) {
+      if (monthKey(new Date(t.date)) !== listMonth) return;
+      if (t.type === "income") income += t.amount; else expense += t.amount;
+    });
+    renderBalance(income, expense, listMonth);
     renderList(state.doc.transactions, bounds);
     renderChart(state.doc.transactions, bounds);
     renderCategorySelect();
     if ($("catDialog").open) renderCatDialog();
     renderSync();
-    $("avatarImg").src = state.avatar || "icons/icon-192.png";
-    applyIcons();
-  }
-
-  /* Favicon e ícone de atalho (iPhone) acompanham a foto privada quando ela existe. */
-  var appliedIcon = null;
-  function applyIcons() {
-    var icon = state.avatar || null;
-    if (icon === appliedIcon) return;
-    appliedIcon = icon;
-    var fav = document.querySelector('link[rel="icon"]'), touch = document.querySelector('link[rel="apple-touch-icon"]');
-    if (fav) fav.setAttribute("href", icon || "favicon.png");
-    if (touch) touch.setAttribute("href", icon || "icons/apple-touch-icon.png");
   }
 
   // ======================================================================
@@ -634,21 +590,6 @@
   function openDialog(dlg) { if (!dlg.open) dlg.showModal(); }
   function wireDialog(dlg) {
     dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); }); // clique no fundo fecha
-  }
-
-  function resizeAvatar(file) {
-    return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file), img = new Image();
-      img.onload = function () {
-        var side = Math.min(img.width, img.height), canvas = document.createElement("canvas");
-        canvas.width = canvas.height = 192;
-        canvas.getContext("2d").drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 192, 192);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/png"));
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("Não foi possível usar essa imagem")); };
-      img.src = url;
-    });
   }
 
   function init() {
@@ -740,7 +681,7 @@
     // sincronização
     $("syncBtn").addEventListener("click", function () { $("syncFormErr").classList.add("hidden"); renderSync(); openDialog($("syncDialog")); });
     $("syncClose").addEventListener("click", function () { $("syncDialog").close(); });
-    $("syncNowBtn").addEventListener("click", function () { syncNow(); refreshAvatar(); });
+    $("syncNowBtn").addEventListener("click", function () { syncNow(); });
     $("disconnectBtn").addEventListener("click", function () { disconnect(); toast("Chave removida deste aparelho"); });
     $("syncOff").addEventListener("submit", function (e) {
       e.preventDefault();
@@ -757,18 +698,6 @@
         err.classList.remove("hidden");
       }).then(function () { btn.disabled = false; });
     });
-    $("avatarBtn").addEventListener("click", function () { $("avatarFile").click(); });
-    $("avatarFile").addEventListener("change", function (e) {
-      var file = e.target.files && e.target.files[0];
-      e.target.value = "";
-      if (!file || !state.config) return;
-      $("avatarBtn").disabled = true;
-      resizeAvatar(file).then(function (dataUrl) {
-        return writeAvatar(state.config, dataUrl).then(function () { cacheAvatar(dataUrl); toast("Foto salva no repositório privado"); });
-      }).catch(function (ex) { toast(ex && ex.message ? ex.message : "Não foi possível usar essa imagem", true); })
-        .then(function () { $("avatarBtn").disabled = false; });
-    });
-
     // backup
     $("exportBtn").addEventListener("click", function () {
       var blob = new Blob([JSON.stringify(state.doc, null, 2)], { type: "application/json" });
@@ -791,16 +720,15 @@
     // dados e gatilhos automáticos
     var cfg = lsJson(KEYS.cfg);
     var config = cfg && typeof cfg.repo === "string" && typeof cfg.token === "string" ? { repo: cfg.repo, token: cfg.token } : null;
-    var avatar = config ? lsGet(KEYS.avatar) : null;
+    lsDel("guigsbank.avatar.v1"); // foto privada da versão anterior: não é mais usada
     state.doc = ensureDefaults(loadDoc());
     state.config = config;
-    state.avatar = avatar;
     state.status = config ? "idle" : "off";
     persistDoc();
     $("date").value = todayInput();
     setType("expense");
     render();
-    if (config) { syncNow(); if (!avatar) refreshAvatar(); }
+    if (config) syncNow();
 
     window.addEventListener("online", function () { syncNow(); });
     window.addEventListener("offline", function () { if (state.config) setState({ status: "offline" }); });
