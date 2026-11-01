@@ -589,6 +589,7 @@
     $("form").classList.toggle("open", open);
     paintToggle();
   }
+  function collapseFormOnMobile() { if (isMobile() && formOpen) setFormOpen(false); }
   function setType(type) {
     formType = type;
     formCategory = categoryOptions(type, state.doc.categories)[0];
@@ -678,6 +679,7 @@
       el.style.transform = "translateX(" + (-dir * 40) + "%)"; el.style.opacity = "0";
       setTimeout(function () {
         viewMonth = shiftMonth(viewMonth, dir);
+        collapseFormOnMobile();
         render();
         el.style.transition = "none";
         el.style.transform = "translateX(" + (dir * 40) + "%)";
@@ -777,6 +779,7 @@
       if (!nav && !now) return;
       // Qualquer um dos dois controles (lista ou gráfico) muda o mês de tudo.
       viewMonth = nav ? shiftMonth(viewMonth, +nav.getAttribute("data-dir")) : monthKey(new Date());
+      collapseFormOnMobile(); // trocar de mês devolve o formulário ao modo compacto
       render();
     }
     $("transactions").addEventListener("click", onMonthClick);
