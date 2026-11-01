@@ -138,9 +138,16 @@
     #amount { font-size: 1.125rem; }
 
     /* lista */
-    .list-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .list-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .75rem; }
+    .mnav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .5rem; padding-bottom: .75rem; border-bottom: 1px solid var(--border); }
+    .mnav.plain { border-bottom: 0; padding-bottom: 0; }
+    .mnav .mlabel { flex: 1; text-align: center; font-size: .875rem; font-weight: 500; }
+    .mnav .now { margin-left: .25rem; height: 1.5rem; padding: 0 .5rem; color: var(--muted-foreground); }
+    .dot2 { width: .75rem; height: .75rem; border-radius: 9999px; flex-shrink: 0; }
+    input[type="date"].field { appearance: none; -webkit-appearance: none; min-height: 3rem; text-align: left; }
     .list-head span { font-size: .75rem; color: var(--muted-foreground); }
     .empty { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2.5rem 0; text-align: center; font-size: .875rem; color: var(--muted-foreground); }
+    .empty.in { border-top: 0; }
     .tx-list > li + li { border-top: 1px solid var(--border); }
     .tx { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 2.75rem; align-items: center; column-gap: .75rem; row-gap: .25rem; padding: 1rem 0; }
     @media (min-width: 640px) { .tx { grid-template-columns: 2.5rem minmax(0, 1fr) auto 2.75rem; column-gap: 1rem; } }
@@ -246,6 +253,10 @@
                 <select class="field" id="category" style="margin-top:.25rem"></select>
               </div>
               <div>
+                <label class="lbl" for="date">Data</label>
+                <input class="field mt15" id="date" type="date" />
+              </div>
+              <div>
                 <label class="lbl" for="desc">Descrição (opcional)</label>
                 <input class="field mt15" id="desc" placeholder="Ex: Almoço com amigos" autocomplete="off" />
               </div>
@@ -300,7 +311,7 @@
       <p class="err hidden" id="syncPublic" role="alert" style="margin-top:.75rem"></p>
       <div class="avatar-row" style="margin-top:1rem">
         <img class="pic" id="avatarPreview" alt="" />
-        <div class="tx-col"><div style="font-weight:500">Foto do app</div><div class="hint">Fica só no seu repositório privado.</div></div>
+        <div class="tx-col"><div style="font-weight:500">Foto do app</div><div class="hint">Fica só no seu repositório privado. Aparece no app e no ícone da aba do navegador.</div></div>
         <button type="button" class="btn outline sm" id="avatarBtn">Trocar</button>
         <input type="file" id="avatarFile" accept="image/*" class="hidden" />
       </div>

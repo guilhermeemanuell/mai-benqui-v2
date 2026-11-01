@@ -14,7 +14,9 @@
     income: ["Salário", "Freelance", "Investimentos", "Presente", "Outros"],
     expense: ["Alimentação", "Transporte", "Moradia", "Lazer", "Saúde", "Compras", "Outros"]
   };
-  var COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)", "var(--chart-7)"];
+  // Paleta viva usada pelas categorias padrão (a mesma do gráfico original).
+  var DEFAULT_COLORS = ["#FFBE0B", "#FB5607", "#FF006E", "#8338EC", "#3A86FF", "#2EC4B6", "#C65B9A"];
+  var SEED_STAMP = "2000-01-01T00:00:00.000Z"; // categorias padrão nunca "vencem" uma exclusão feita depois
 
   var $ = function (id) { return document.getElementById(id); };
   var brl = function (n) { return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); };
@@ -39,6 +41,8 @@
     refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
     upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+    left: '<path d="m15 18-6-6 6-6"/>',
+    right: '<path d="m9 18 6-6-6-6"/>',
     warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
   };
   function svg(name, cls) {
@@ -65,7 +69,7 @@
   function normalize(doc) {
     var deleted = {};
     Object.keys(doc.deleted).sort().forEach(function (id) { deleted[id] = doc.deleted[id]; });
-    return { version: 1, transactions: doc.transactions.slice().sort(byId), categories: doc.categories.slice().sort(byId), deleted: deleted };
+    return { version: 1, transactions: doc.transactions.slice().sort(byId), categories: doc.categories.slice().sort(byId), deleted: deleted, seeded: doc.seeded === true ? true : undefined };
   }
   function serialize(doc) { return JSON.stringify(normalize(doc)); }
 
@@ -101,7 +105,7 @@
       Object.keys(dropped).forEach(function (id) { deleted[id] = deleted[id] || now; });
       categories = categories.filter(function (c) { return !dropped[c.id]; });
     }
-    return normalize({ transactions: transactions, categories: categories, deleted: deleted });
+    return normalize({ transactions: transactions, categories: categories, deleted: deleted, seeded: a.seeded === true || b.seeded === true });
   }
 
   function parseDoc(value) {
@@ -119,7 +123,7 @@
     if (value.deleted && typeof value.deleted === "object") {
       Object.keys(value.deleted).forEach(function (id) { if (typeof value.deleted[id] === "string") deleted[id] = value.deleted[id]; });
     }
-    return normalize({ transactions: transactions, categories: categories, deleted: deleted });
+    return normalize({ transactions: transactions, categories: categories, deleted: deleted, seeded: value.seeded === true });
   }
 
   /* Lista antiga (versão do Lovable): só transações. */
@@ -135,16 +139,100 @@
   // ======================================================================
   // Categorias
   // ======================================================================
+  function catOrder(c) { return typeof c.order === "number" ? c.order : (Date.parse(c.updatedAt) || 0); }
+  function sortedCats(type, custom) {
+    return custom.filter(function (c) { return c.type === type; }).sort(function (a, b) { return catOrder(a) - catOrder(b) || byId(a, b); });
+  }
   function categoryOptions(type, custom) {
-    return CATEGORIES[type].concat(custom.filter(function (c) { return c.type === type; }).map(function (c) { return c.name; }));
+    var names = sortedCats(type, custom).map(function (c) { return c.name; });
+    return names.length ? names : ["Outros"];
   }
   function validateCategoryName(type, input, custom) {
     var name = String(input).trim().replace(/\s+/g, " ");
     if (!name) throw new Error("Informe o nome da categoria");
     if (name.length > 40) throw new Error("Use até 40 caracteres");
     var low = name.toLocaleLowerCase("pt-BR");
-    if (categoryOptions(type, custom).some(function (e) { return e.toLocaleLowerCase("pt-BR") === low; })) throw new Error("Esta categoria já existe");
+    if (sortedCats(type, custom).some(function (e) { return e.name.toLocaleLowerCase("pt-BR") === low; })) throw new Error("Esta categoria já existe");
     return name;
+  }
+
+  /* Cores: vivas (saturação alta), sempre longe das já usadas no mesmo tipo. */
+  function hslToHex(h, sat, lig) {
+    sat /= 100; lig /= 100;
+    var a = sat * Math.min(lig, 1 - lig);
+    function f(n) {
+      var k = (n + h / 30) % 12;
+      var c = lig - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+      var hex = Math.round(c * 255).toString(16);
+      return hex.length < 2 ? "0" + hex : hex;
+    }
+    return "#" + f(0) + f(8) + f(4);
+  }
+  function hexToHue(hex) {
+    var r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, h = 0;
+    if (d === 0) return 0;
+    if (max === r) h = ((g - b) / d) % 6; else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+  }
+  function randomColor(usedColors) {
+    var hues = usedColors.filter(function (c) { return /^#[0-9a-f]{6}$/i.test(c); }).map(hexToHue);
+    var best = null, bestDist = -1;
+    for (var i = 0; i < 40; i++) {
+      var h = Math.random() * 360, dist = 360;
+      hues.forEach(function (u) { var d = Math.abs(h - u); dist = Math.min(dist, Math.min(d, 360 - d)); });
+      if (dist > bestDist) { bestDist = dist; best = h; }
+    }
+    return hslToHex(best, 88 + Math.random() * 12, 52 + Math.random() * 8);
+  }
+  function hashColor(name) {
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return hslToHex(h % 360, 92, 55);
+  }
+  function colorOf(type, name) {
+    var c = state.doc.categories.filter(function (x) { return x.type === type && x.name === name; })[0];
+    return (c && c.color) || hashColor(name);
+  }
+
+  /* As categorias padrão viram categorias comuns (com opção de apagar). Ids fixos: todos os aparelhos geram as mesmas. */
+  function ensureDefaults(doc) {
+    if (doc.seeded) return doc;
+    var categories = doc.categories.slice();
+    ["expense", "income"].forEach(function (type) {
+      CATEGORIES[type].forEach(function (name, i) {
+        var id = "default:" + type + ":" + name;
+        if (doc.deleted[id]) return;
+        var low = name.toLocaleLowerCase("pt-BR");
+        var exists = categories.some(function (c) { return c.id === id || (c.type === type && c.name.trim().toLocaleLowerCase("pt-BR") === low); });
+        if (!exists) categories.push({ id: id, type: type, name: name, color: DEFAULT_COLORS[i % DEFAULT_COLORS.length], order: i, updatedAt: SEED_STAMP });
+      });
+    });
+    return Object.assign({}, doc, { categories: categories, seeded: true });
+  }
+
+  // ======================================================================
+  // Meses (a lista e o gráfico mostram um mês por vez)
+  // ======================================================================
+  function monthKey(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2); }
+  function shiftMonth(key, dir) { var p = key.split("-"); return monthKey(new Date(+p[0], +p[1] - 1 + dir, 1)); }
+  function monthLabel(key) {
+    var p = key.split("-");
+    var text = new Date(+p[0], +p[1] - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+  /* Só dá para navegar entre o mês atual e os meses que têm transações. */
+  function monthBounds(txs) {
+    var cur = monthKey(new Date()), min = cur, max = cur;
+    txs.forEach(function (t) { var k = monthKey(new Date(t.date)); if (k < min) min = k; if (k > max) max = k; });
+    return { min: min, max: max, cur: cur };
+  }
+  function clampMonth(key, b) { return key < b.min ? b.min : key > b.max ? b.max : key; }
+  function monthNav(scope, key, b, plain) {
+    return '<div class="mnav' + (plain ? " plain" : "") + '">' +
+      '<button type="button" class="btn ghost icon" data-nav="' + scope + '" data-dir="-1" aria-label="Mês anterior"' + (key <= b.min ? " disabled" : "") + ">" + svg("left") + "</button>" +
+      '<div class="mlabel">' + monthLabel(key) + (key !== b.cur ? ' <button type="button" class="btn ghost sm now" data-now="' + scope + '">Mês atual</button>' : "") + "</div>" +
+      '<button type="button" class="btn ghost icon" data-nav="' + scope + '" data-dir="1" aria-label="Próximo mês"' + (key >= b.max ? " disabled" : "") + ">" + svg("right") + "</button></div>";
   }
 
   // ======================================================================
@@ -152,6 +240,8 @@
   // ======================================================================
   var state = { doc: emptyDoc(), config: null, status: "off", lastSync: null, error: null, avatar: null };
   var formType = "expense";
+  var listMonth = monthKey(new Date());
+  var chartMonth = listMonth;
   var formCategory = CATEGORIES.expense[0];
   var timer = null;
 
@@ -192,7 +282,8 @@
   }
   function addCategory(type, name) {
     var valid = validateCategoryName(type, name, state.doc.categories);
-    var category = { id: uid(), type: type, name: valid, updatedAt: nowIso() };
+    var used = state.doc.categories.filter(function (c) { return c.type === type; }).map(function (c) { return c.color || hashColor(c.name); });
+    var category = { id: uid(), type: type, name: valid, color: randomColor(used), order: Date.now(), updatedAt: nowIso() };
     changeDoc(Object.assign({}, state.doc, { categories: state.doc.categories.concat([category]) }));
     return category;
   }
@@ -399,9 +490,12 @@
       "</div>";
   }
 
-  function renderList(sorted) {
-    if (!sorted.length) { $("transactions").innerHTML = '<div class="empty">Nenhuma transação registrada.</div>'; return; }
-    var html = '<section><div class="list-head"><h2>Transações recentes</h2><span>' + sorted.length + ' no total</span></div><ul class="tx-list">';
+  function renderList(all, bounds) {
+    var sorted = all.filter(function (t) { return monthKey(new Date(t.date)) === listMonth; })
+      .sort(function (x, y) { return +new Date(y.date) - +new Date(x.date); });
+    var html = '<section><div class="list-head"><h2>Transações recentes</h2><span>' + sorted.length + " no mês</span></div>" + monthNav("list", listMonth, bounds);
+    if (!sorted.length) { $("transactions").innerHTML = html + '<div class="empty in">Nenhuma transação em ' + monthLabel(listMonth).toLocaleLowerCase("pt-BR") + ".</div></section>"; return; }
+    html += '<ul class="tx-list">';
     sorted.forEach(function (tx) {
       var inc = tx.type === "income";
       var date = new Date(tx.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
@@ -415,24 +509,24 @@
     $("transactions").innerHTML = html + "</ul></section>";
   }
 
-  function renderChart(txs) {
+  function renderChart(txs, bounds) {
     var map = {}, order = [];
     txs.forEach(function (t) {
-      if (t.type !== "expense") return;
+      if (t.type !== "expense" || monthKey(new Date(t.date)) !== chartMonth) return;
       if (!(t.category in map)) { map[t.category] = 0; order.push(t.category); }
       map[t.category] += t.amount;
     });
-    var data = order.map(function (n) { return { name: n, value: map[n] }; }).sort(function (a, b) { return b.value - a.value; });
+    var data = order.map(function (n) { return { name: n, value: map[n], color: colorOf("expense", n) }; }).sort(function (a, b) { return b.value - a.value; });
     var total = data.reduce(function (s, d) { return s + d.value; }, 0);
-    var html = "<h2>Despesas por categoria</h2>";
+    var html = "<h2>Despesas por categoria</h2>" + monthNav("chart", chartMonth, bounds, true);
     if (!data.length) {
-      $("chart").innerHTML = html + '<div class="empty-c">Sem despesas registradas</div>';
+      $("chart").innerHTML = html + '<div class="empty-c">Sem despesas em ' + monthLabel(chartMonth).toLocaleLowerCase("pt-BR") + "</div>";
       return;
     }
     var R = 70, C = 2 * Math.PI * R, gap = data.length > 1 ? (2 / 360) * C : 0, acc = 0;
-    var rings = data.map(function (d, i) {
+    var rings = data.map(function (d) {
       var len = (d.value / total) * C;
-      var circle = '<circle r="' + R + '" cx="0" cy="0" fill="none" stroke-width="30" style="stroke:' + COLORS[i % COLORS.length] + '" ' +
+      var circle = '<circle r="' + R + '" cx="0" cy="0" fill="none" stroke-width="30" style="stroke:' + d.color + '" ' +
         'stroke-dasharray="' + Math.max(len - gap, 0.01).toFixed(3) + " " + C.toFixed(3) + '" stroke-dashoffset="' + (-acc).toFixed(3) + '" transform="rotate(-90)">' +
         "<title>" + esc(d.name) + ": " + brl(d.value) + "</title></circle>";
       acc += len;
@@ -440,8 +534,8 @@
     }).join("");
     html += '<div class="donut"><svg viewBox="-100 -96 200 192" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Despesas por categoria">' + rings + "</svg>" +
       '<div class="center"><div><div class="t">Total</div><div class="v">' + brl(total) + "</div></div></div></div>";
-    html += '<ul class="legend">' + data.map(function (d, i) {
-      return '<li><div class="n"><span class="dot" style="background:' + COLORS[i % COLORS.length] + '"></span><span>' + esc(d.name) + '</span></div><span class="v tnum">' + brl(d.value) + "</span></li>";
+    html += '<ul class="legend">' + data.map(function (d) {
+      return '<li><div class="n"><span class="dot" style="background:' + d.color + '"></span><span>' + esc(d.name) + '</span></div><span class="v tnum">' + brl(d.value) + "</span></li>";
     }).join("") + "</ul>";
     $("chart").innerHTML = html;
   }
@@ -461,11 +555,11 @@
 
   function renderCatDialog() {
     $("catTitle").textContent = "Categorias de " + (formType === "income" ? "receita" : "despesa");
-    var html = state.doc.categories.filter(function (c) { return c.type === formType; }).map(function (c) {
-      return '<li><span>' + esc(c.name) + '</span><button type="button" class="btn ghost i44 muted-btn del" data-delcat="' + esc(c.id) + '" aria-label="Excluir categoria ' + esc(c.name) + '" title="Excluir categoria">' + svg("trash") + "</button></li>";
-    }).join("");
-    html += CATEGORIES[formType].map(function (c) { return '<li class="std"><span>' + esc(c) + '</span><span class="tag">Padrão</span></li>'; }).join("");
-    $("catList").innerHTML = html;
+    var list = sortedCats(formType, state.doc.categories);
+    $("catList").innerHTML = list.length ? list.map(function (c) {
+      return '<li><span style="display:flex;align-items:center;gap:.5rem;min-width:0"><span class="dot2" style="background:' + (c.color || hashColor(c.name)) + '"></span><span style="min-width:0;overflow-wrap:break-word">' + esc(c.name) + "</span></span>" +
+        '<button type="button" class="btn ghost i44 muted-btn del" data-delcat="' + esc(c.id) + '" aria-label="Excluir categoria ' + esc(c.name) + '" title="Excluir categoria">' + svg("trash") + "</button></li>";
+    }).join("") : '<li class="std"><span class="muted">Nenhuma categoria. Cadastre uma acima.</span></li>';
   }
 
   function renderSync() {
@@ -488,14 +582,28 @@
   function render() {
     var income = 0, expense = 0;
     state.doc.transactions.forEach(function (t) { if (t.type === "income") income += t.amount; else expense += t.amount; });
-    var sorted = state.doc.transactions.slice().sort(function (a, b) { return +new Date(b.date) - +new Date(a.date); });
+    var bounds = monthBounds(state.doc.transactions);
+    listMonth = clampMonth(listMonth, bounds);
+    chartMonth = clampMonth(chartMonth, bounds);
     renderBalance(income, expense);
-    renderList(sorted);
-    renderChart(state.doc.transactions);
+    renderList(state.doc.transactions, bounds);
+    renderChart(state.doc.transactions, bounds);
     renderCategorySelect();
     if ($("catDialog").open) renderCatDialog();
     renderSync();
     $("avatarImg").src = state.avatar || "icons/icon-192.png";
+    applyIcons();
+  }
+
+  /* Favicon e ícone de atalho (iPhone) acompanham a foto privada quando ela existe. */
+  var appliedIcon = null;
+  function applyIcons() {
+    var icon = state.avatar || null;
+    if (icon === appliedIcon) return;
+    appliedIcon = icon;
+    var fav = document.querySelector('link[rel="icon"]'), touch = document.querySelector('link[rel="apple-touch-icon"]');
+    if (fav) fav.setAttribute("href", icon || "favicon.png");
+    if (touch) touch.setAttribute("href", icon || "icons/apple-touch-icon.png");
   }
 
   // ======================================================================
@@ -503,13 +611,24 @@
   // ======================================================================
   function setType(type) {
     formType = type;
-    formCategory = CATEGORIES[type][0];
+    formCategory = categoryOptions(type, state.doc.categories)[0];
     document.querySelectorAll(".toggle .btn").forEach(function (b) {
       var on = b.getAttribute("data-type") === type;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", String(on));
     });
     renderCategorySelect();
+  }
+
+  function localDay(d) { return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function todayInput() { return localDay(new Date()); }
+  /* Hoje: usa o instante atual. Outro dia: meio-dia local desse dia (evita virar o dia por fuso). */
+  function dateFromInput(value) {
+    if (!value) return nowIso();
+    if (value === todayInput()) return nowIso();
+    var p = value.split("-");
+    var d = new Date(+p[0], +p[1] - 1, +p[2], 12, 0, 0);
+    return isNaN(d.getTime()) || localDay(d) !== value ? null : d.toISOString();
   }
 
   function openDialog(dlg) { if (!dlg.open) dlg.showModal(); }
@@ -554,15 +673,30 @@
       e.preventDefault();
       var value = parseFloat($("amount").value.replace(",", "."));
       if (!value || value <= 0) { toast("Informe um valor válido", true); return; }
+      var when = dateFromInput($("date").value);
+      if (!when) { toast("Informe uma data válida", true); return; }
       var cat = selectedCategory();
-      addTransaction({ id: uid(), type: formType, amount: value, category: cat, description: $("desc").value.trim() || cat, date: nowIso() });
-      $("amount").value = ""; $("desc").value = "";
+      addTransaction({ id: uid(), type: formType, amount: value, category: cat, description: $("desc").value.trim() || cat, date: when });
+      var shown = monthKey(new Date(when));
+      listMonth = shown; chartMonth = shown; // mostra o mês da transação recém-criada
+      $("amount").value = ""; $("desc").value = ""; $("date").value = todayInput();
+      render();
       toast("Transação adicionada");
     });
     $("transactions").addEventListener("click", function (e) {
       var btn = e.target.closest("[data-del]");
       if (btn) deleteTransaction(btn.getAttribute("data-del"));
     });
+    function onMonthClick(e) {
+      var nav = e.target.closest("[data-nav]"), now = e.target.closest("[data-now]");
+      if (!nav && !now) return;
+      var scope = (nav || now).getAttribute(nav ? "data-nav" : "data-now");
+      var next = nav ? shiftMonth(scope === "list" ? listMonth : chartMonth, +nav.getAttribute("data-dir")) : monthKey(new Date());
+      if (scope === "list") listMonth = next; else chartMonth = next;
+      render();
+    }
+    $("transactions").addEventListener("click", onMonthClick);
+    $("chart").addEventListener("click", onMonthClick);
 
     // categorias
     var pendingDelete = null;
@@ -658,11 +792,12 @@
     var cfg = lsJson(KEYS.cfg);
     var config = cfg && typeof cfg.repo === "string" && typeof cfg.token === "string" ? { repo: cfg.repo, token: cfg.token } : null;
     var avatar = config ? lsGet(KEYS.avatar) : null;
-    state.doc = loadDoc();
+    state.doc = ensureDefaults(loadDoc());
     state.config = config;
     state.avatar = avatar;
     state.status = config ? "idle" : "off";
     persistDoc();
+    $("date").value = todayInput();
     setType("expense");
     render();
     if (config) { syncNow(); if (!avatar) refreshAvatar(); }
