@@ -240,8 +240,7 @@
   // ======================================================================
   var state = { doc: emptyDoc(), config: null, status: "off", lastSync: null, error: null };
   var formType = "expense";
-  var listMonth = monthKey(new Date());
-  var chartMonth = listMonth;
+  var viewMonth = monthKey(new Date()); // mês exibido: cartão de saldo, lista e gráfico andam sempre juntos
   var formCategory = CATEGORIES.expense[0];
   var timer = null;
 
@@ -464,10 +463,10 @@
   }
 
   function renderList(all, bounds) {
-    var sorted = all.filter(function (t) { return monthKey(new Date(t.date)) === listMonth; })
+    var sorted = all.filter(function (t) { return monthKey(new Date(t.date)) === viewMonth; })
       .sort(function (x, y) { return +new Date(y.date) - +new Date(x.date); });
-    var html = '<section><div class="list-head"><h2>Transações recentes</h2><span>' + sorted.length + " no mês</span></div>" + monthNav("list", listMonth, bounds);
-    if (!sorted.length) { $("transactions").innerHTML = html + '<div class="empty in">Nenhuma transação em ' + monthLabel(listMonth).toLocaleLowerCase("pt-BR") + ".</div></section>"; return; }
+    var html = '<section><div class="list-head"><h2>Transações recentes</h2><span>' + sorted.length + " no mês</span></div>" + monthNav("list", viewMonth, bounds);
+    if (!sorted.length) { $("transactions").innerHTML = html + '<div class="empty in">Nenhuma transação em ' + monthLabel(viewMonth).toLocaleLowerCase("pt-BR") + ".</div></section>"; return; }
     html += '<ul class="tx-list">';
     sorted.forEach(function (tx) {
       var inc = tx.type === "income";
@@ -487,15 +486,15 @@
   function renderChart(txs, bounds) {
     var map = {}, order = [];
     txs.forEach(function (t) {
-      if (t.type !== "expense" || monthKey(new Date(t.date)) !== chartMonth) return;
+      if (t.type !== "expense" || monthKey(new Date(t.date)) !== viewMonth) return;
       if (!(t.category in map)) { map[t.category] = 0; order.push(t.category); }
       map[t.category] += t.amount;
     });
     var data = order.map(function (n) { return { name: n, value: map[n], color: colorOf("expense", n) }; }).sort(function (a, b) { return b.value - a.value; });
     var total = data.reduce(function (s, d) { return s + d.value; }, 0);
-    var html = "<h2>Despesas por categoria</h2>" + monthNav("chart", chartMonth, bounds, true);
+    var html = "<h2>Despesas por categoria</h2>" + monthNav("chart", viewMonth, bounds, true);
     if (!data.length) {
-      $("chart").innerHTML = html + '<div class="empty-c">Sem despesas em ' + monthLabel(chartMonth).toLocaleLowerCase("pt-BR") + "</div>";
+      $("chart").innerHTML = html + '<div class="empty-c">Sem despesas em ' + monthLabel(viewMonth).toLocaleLowerCase("pt-BR") + "</div>";
       return;
     }
     var R = 70, C = 2 * Math.PI * R, gap = data.length > 1 ? (2 / 360) * C : 0, acc = 0;
@@ -555,15 +554,14 @@
 
   function render() {
     var bounds = monthBounds(state.doc.transactions);
-    listMonth = clampMonth(listMonth, bounds);
-    chartMonth = clampMonth(chartMonth, bounds);
-    // Saldo, receitas e despesas do cartão seguem o mês exibido em "Transações recentes".
+    viewMonth = clampMonth(viewMonth, bounds);
+    // Saldo, receitas e despesas do cartão seguem o mês exibido (o mesmo da lista e do gráfico).
     var income = 0, expense = 0;
     state.doc.transactions.forEach(function (t) {
-      if (monthKey(new Date(t.date)) !== listMonth) return;
+      if (monthKey(new Date(t.date)) !== viewMonth) return;
       if (t.type === "income") income += t.amount; else expense += t.amount;
     });
-    renderBalance(income, expense, listMonth);
+    renderBalance(income, expense, viewMonth);
     renderList(state.doc.transactions, bounds);
     renderChart(state.doc.transactions, bounds);
     renderCategorySelect();
@@ -574,14 +572,27 @@
   // ======================================================================
   // Eventos
   // ======================================================================
+  // No celular o formulário começa recolhido: só aparecem "Despesa" e "Receita"; ao tocar em um, os campos descem.
+  var formOpen = false;
+  function isMobile() { return window.matchMedia("(max-width: 767px)").matches; }
+  function paintToggle() {
+    var visible = !isMobile() || formOpen;
+    document.querySelectorAll("#form .toggle .btn").forEach(function (b) {
+      var on = visible && b.getAttribute("data-type") === formType;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+      b.setAttribute("aria-expanded", String(visible));
+    });
+  }
+  function setFormOpen(open) {
+    formOpen = open;
+    $("form").classList.toggle("open", open);
+    paintToggle();
+  }
   function setType(type) {
     formType = type;
     formCategory = categoryOptions(type, state.doc.categories)[0];
-    document.querySelectorAll("#form .toggle .btn").forEach(function (b) {
-      var on = b.getAttribute("data-type") === type;
-      b.classList.toggle("on", on);
-      b.setAttribute("aria-pressed", String(on));
-    });
+    paintToggle();
     renderCategorySelect();
   }
 
@@ -637,7 +648,7 @@
     if (!when) return fail("Informe uma data válida");
     var cat = $("eCategory").value;
     var movedTo = monthKey(new Date(when));
-    if (movedTo !== monthKey(new Date(tx.date))) { listMonth = movedTo; chartMonth = movedTo; } // acompanha a transação para o novo mês
+    if (movedTo !== monthKey(new Date(tx.date))) viewMonth = movedTo; // acompanha a transação para o novo mês
     updateTransaction(editingId, { type: editType, amount: value, category: cat, description: $("eDesc").value.trim() || cat, date: when });
     $("editDialog").close();
     editingId = null;
@@ -647,6 +658,62 @@
   function openDialog(dlg) { if (!dlg.open) dlg.showModal(); }
   function wireDialog(dlg) {
     dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); }); // clique no fundo fecha
+  }
+
+  /* Cartão roxo: arrastar para a esquerda mostra o mês seguinte; para a direita, o anterior. */
+  function initSwipe() {
+    var el = $("balance"), startX = 0, startY = 0, dx = 0, id = null, dragging = false, busy = false;
+    function canGo(dir) {
+      var b = monthBounds(state.doc.transactions), next = shiftMonth(viewMonth, dir);
+      return next >= b.min && next <= b.max;
+    }
+    function snapBack() {
+      el.style.transition = "transform .2s ease, opacity .2s ease";
+      el.style.transform = ""; el.style.opacity = "";
+    }
+    function go(dir) {
+      if (!canGo(dir)) return false;
+      busy = true;
+      el.style.transition = "transform .16s ease-in, opacity .16s ease-in";
+      el.style.transform = "translateX(" + (-dir * 40) + "%)"; el.style.opacity = "0";
+      setTimeout(function () {
+        viewMonth = shiftMonth(viewMonth, dir);
+        render();
+        el.style.transition = "none";
+        el.style.transform = "translateX(" + (dir * 40) + "%)";
+        void el.offsetWidth;
+        el.style.transition = "transform .2s ease-out, opacity .2s ease-out";
+        el.style.transform = ""; el.style.opacity = "";
+        setTimeout(function () { busy = false; el.style.transition = ""; }, 230);
+      }, 160);
+      return true;
+    }
+    el.addEventListener("pointerdown", function (e) {
+      if (busy || e.pointerType !== "touch") return;
+      id = e.pointerId; startX = e.clientX; startY = e.clientY; dx = 0; dragging = false;
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (e.pointerId !== id) return;
+      dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      if (!dragging) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+        dragging = true;
+        try { el.setPointerCapture(id); } catch (err) { /* ignora */ }
+      }
+      el.style.transition = "none";
+      el.style.transform = "translateX(" + (dx * (canGo(dx < 0 ? 1 : -1) ? 0.6 : 0.2)) + "px)"; // sem mês nessa direção: resiste
+    });
+    function end(e) {
+      if (e.pointerId !== id) return;
+      id = null;
+      if (!dragging) return;
+      dragging = false;
+      if (e.type === "pointerup" && Math.abs(dx) >= 60 && go(dx < 0 ? 1 : -1)) return;
+      snapBack();
+    }
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
   }
 
   function init() {
@@ -666,8 +733,18 @@
 
     // transações
     document.querySelectorAll("#form .toggle .btn").forEach(function (b) {
-      b.addEventListener("click", function () { setType(b.getAttribute("data-type")); });
+      b.addEventListener("click", function () {
+        var type = b.getAttribute("data-type");
+        if (isMobile()) {
+          if (formOpen && formType === type) { setFormOpen(false); return; } // tocar de novo no tipo ativo recolhe
+          setFormOpen(true);
+        }
+        setType(type);
+      });
     });
+    var mq = window.matchMedia("(max-width: 767px)");
+    var onMq = function () { paintToggle(); };
+    if (mq.addEventListener) mq.addEventListener("change", onMq); else if (mq.addListener) mq.addListener(onMq);
     $("category").addEventListener("change", function (e) { formCategory = e.target.value; });
     $("form").addEventListener("submit", function (e) {
       e.preventDefault();
@@ -678,9 +755,10 @@
       var cat = selectedCategory();
       addTransaction({ id: uid(), type: formType, amount: value, category: cat, description: $("desc").value.trim() || cat, date: when });
       var shown = monthKey(new Date(when));
-      listMonth = shown; chartMonth = shown; // mostra o mês da transação recém-criada
+      viewMonth = shown; // mostra o mês da transação recém-criada
       $("amount").value = ""; $("desc").value = ""; $("date").value = todayInput();
       render();
+      if (isMobile()) setFormOpen(false); // volta ao formato compacto
       toast("Transação adicionada");
     });
     $("transactions").addEventListener("click", function (e) {
@@ -697,9 +775,8 @@
     function onMonthClick(e) {
       var nav = e.target.closest("[data-nav]"), now = e.target.closest("[data-now]");
       if (!nav && !now) return;
-      var scope = (nav || now).getAttribute(nav ? "data-nav" : "data-now");
-      var next = nav ? shiftMonth(scope === "list" ? listMonth : chartMonth, +nav.getAttribute("data-dir")) : monthKey(new Date());
-      if (scope === "list") listMonth = next; else chartMonth = next;
+      // Qualquer um dos dois controles (lista ou gráfico) muda o mês de tudo.
+      viewMonth = nav ? shiftMonth(viewMonth, +nav.getAttribute("data-dir")) : monthKey(new Date());
       render();
     }
     $("transactions").addEventListener("click", onMonthClick);
@@ -794,6 +871,7 @@
     $("date").value = todayInput();
     setType("expense");
     render();
+    initSwipe();
     if (config) syncNow();
 
     window.addEventListener("online", function () { syncNow(); });

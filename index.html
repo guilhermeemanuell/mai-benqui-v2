@@ -92,7 +92,7 @@
     }
 
     /* saldo */
-    .balance { border-radius: var(--radius); background: var(--balance); color: var(--balance-foreground); padding: 1.25rem; min-width: 0; }
+    .balance { border-radius: var(--radius); background: var(--balance); color: var(--balance-foreground); padding: 1.25rem; min-width: 0; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
     @media (min-width: 640px) { .balance { padding: 2rem; } }
     .balance .lbl { display: flex; align-items: center; gap: .5rem; font-size: .875rem; color: var(--balance-muted); }
     .balance .total { margin-top: .75rem; font-family: var(--font-display); font-size: 2rem; line-height: 1.2; font-weight: 500; }
@@ -138,6 +138,15 @@
     .toggle .btn:hover { color: var(--foreground); background: transparent; }
     .toggle .btn.on.expense { background: var(--destructive); color: var(--destructive-foreground); box-shadow: var(--shadow-card); }
     .toggle .btn.on.income { background: var(--success); color: var(--success-foreground); box-shadow: var(--shadow-card); }
+    /* Formulário recolhível: só no celular os campos começam escondidos (veja app.js). */
+    .collapsible { display: grid; grid-template-rows: 1fr; }
+    .collapse-inner { min-height: 0; }
+    @media (max-width: 767px) {
+      .collapsible { grid-template-rows: 0fr; transition: grid-template-rows .28s ease; }
+      #form.open .collapsible { grid-template-rows: 1fr; }
+      .collapse-inner { overflow: hidden; visibility: hidden; transition: visibility 0s linear .28s; padding: 0 2px; margin: 0 -2px; }
+      #form.open .collapse-inner { visibility: visible; transition-delay: 0s; padding-bottom: 2px; }
+    }
     .stack > * + * { margin-top: 1rem; }
     .stack { margin-top: 1rem; }
     .row-between { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
@@ -244,6 +253,7 @@
               <button type="button" class="btn expense" data-type="expense" aria-pressed="true"></button>
               <button type="button" class="btn income" data-type="income" aria-pressed="false"></button>
             </div>
+            <div class="collapsible"><div class="collapse-inner">
             <div class="stack">
               <div>
                 <label class="lbl" for="amount">Valor (R$)</label>
@@ -266,6 +276,7 @@
               </div>
               <button type="submit" class="btn lg" id="addBtn"></button>
             </div>
+            </div></div>
           </form>
         </div>
 
