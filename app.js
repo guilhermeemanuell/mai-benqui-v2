@@ -42,6 +42,7 @@
     upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
     left: '<path d="m15 18-6-6 6-6"/>',
     right: '<path d="m9 18 6-6-6-6"/>',
+    pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
     warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
   };
   function svg(name, cls) {
@@ -275,6 +276,12 @@
     tx.updatedAt = nowIso();
     changeDoc(Object.assign({}, state.doc, { transactions: [tx].concat(state.doc.transactions) }));
   }
+  function updateTransaction(id, fields) {
+    var stamp = nowIso();
+    changeDoc(Object.assign({}, state.doc, { transactions: state.doc.transactions.map(function (t) {
+      return t.id === id ? Object.assign({}, t, fields, { updatedAt: stamp }) : t;
+    }) }));
+  }
   function deleteTransaction(id) {
     var deleted = Object.assign({}, state.doc.deleted); deleted[id] = nowIso();
     changeDoc(Object.assign({}, state.doc, { transactions: state.doc.transactions.filter(function (t) { return t.id !== id; }), deleted: deleted }));
@@ -469,8 +476,10 @@
         '<div class="ico ' + (inc ? "in" : "out") + '">' + svg(inc ? "up" : "down") + "</div>" +
         '<div class="info"><div class="d">' + esc(tx.description) + '</div><div class="m">' + esc(tx.category) + " · " + date + "</div></div>" +
         '<div class="amt tnum wrap-any">' + (inc ? "+" : "−") + " " + brl(tx.amount) + "</div>" +
-        '<button type="button" class="btn ghost icon i44 muted-btn del" data-del="' + esc(tx.id) + '" aria-label="Excluir ' + esc(tx.description) + '" title="Excluir transação">' + svg("trash") + "</button>" +
-        "</li>";
+        '<div class="acts">' +
+          '<button type="button" class="btn ghost icon i44 muted-btn" data-edit="' + esc(tx.id) + '" aria-label="Editar ' + esc(tx.description) + '" title="Editar transação">' + svg("pencil") + "</button>" +
+          '<button type="button" class="btn ghost icon i44 muted-btn del" data-del="' + esc(tx.id) + '" aria-label="Excluir ' + esc(tx.description) + '" title="Excluir transação">' + svg("trash") + "</button>" +
+        "</div></li>";
     });
     $("transactions").innerHTML = html + "</ul></section>";
   }
@@ -568,7 +577,7 @@
   function setType(type) {
     formType = type;
     formCategory = categoryOptions(type, state.doc.categories)[0];
-    document.querySelectorAll(".toggle .btn").forEach(function (b) {
+    document.querySelectorAll("#form .toggle .btn").forEach(function (b) {
       var on = b.getAttribute("data-type") === type;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", String(on));
@@ -587,6 +596,54 @@
     return isNaN(d.getTime()) || localDay(d) !== value ? null : d.toISOString();
   }
 
+  // ---------- edição de transação ----------
+  var editingId = null, editType = "expense";
+  function fillEditCategories(selected) {
+    var opts = categoryOptions(editType, state.doc.categories);
+    if (selected && opts.indexOf(selected) < 0) opts = opts.concat([selected]); // categoria já excluída: mantém a atual
+    $("eCategory").innerHTML = opts.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + "</option>"; }).join("");
+    $("eCategory").value = selected && opts.indexOf(selected) >= 0 ? selected : opts[0];
+  }
+  function setEditType(type, selectedCategory) {
+    editType = type;
+    document.querySelectorAll("#editForm .toggle .btn").forEach(function (b) {
+      var on = b.getAttribute("data-etype") === type;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    fillEditCategories(selectedCategory || null);
+  }
+  function openEdit(id) {
+    var tx = state.doc.transactions.filter(function (t) { return t.id === id; })[0];
+    if (!tx) return;
+    editingId = id;
+    $("eAmount").value = tx.amount.toFixed(2).replace(".", ",");
+    $("eDate").value = localDay(new Date(tx.date));
+    $("eDesc").value = tx.description;
+    $("eErr").classList.add("hidden");
+    setEditType(tx.type, tx.category);
+    $("editDialog").showModal();
+  }
+  function saveEdit() {
+    var tx = state.doc.transactions.filter(function (t) { return t.id === editingId; })[0];
+    var err = $("eErr");
+    function fail(message) { err.textContent = message; err.classList.remove("hidden"); }
+    if (!tx) { $("editDialog").close(); return; }
+    var value = parseFloat($("eAmount").value.replace(",", "."));
+    if (!value || value <= 0) return fail("Informe um valor válido");
+    var dayValue = $("eDate").value;
+    // Mesma data: preserva o horário original. Outra data: usa o critério do formulário de lançamento.
+    var when = !dayValue || dayValue === localDay(new Date(tx.date)) ? tx.date : dateFromInput(dayValue);
+    if (!when) return fail("Informe uma data válida");
+    var cat = $("eCategory").value;
+    var movedTo = monthKey(new Date(when));
+    if (movedTo !== monthKey(new Date(tx.date))) { listMonth = movedTo; chartMonth = movedTo; } // acompanha a transação para o novo mês
+    updateTransaction(editingId, { type: editType, amount: value, category: cat, description: $("eDesc").value.trim() || cat, date: when });
+    $("editDialog").close();
+    editingId = null;
+    toast("Transação atualizada");
+  }
+
   function openDialog(dlg) { if (!dlg.open) dlg.showModal(); }
   function wireDialog(dlg) {
     dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); }); // clique no fundo fecha
@@ -596,6 +653,8 @@
     // textos e ícones fixos
     document.querySelector('[data-type="expense"]').innerHTML = svg("down") + "Despesa";
     document.querySelector('[data-type="income"]').innerHTML = svg("up") + "Receita";
+    document.querySelector('[data-etype="expense"]').innerHTML = svg("down") + "Despesa";
+    document.querySelector('[data-etype="income"]').innerHTML = svg("up") + "Receita";
     $("catManage").innerHTML = svg("sliders");
     $("catAdd").innerHTML = svg("plus");
     $("addBtn").innerHTML = svg("plus") + " Adicionar";
@@ -603,10 +662,10 @@
     $("importBtn").innerHTML = svg("upload") + " Importar";
     $("connectBtn").innerHTML = svg("cloud") + " Conectar e sincronizar";
     $("today").textContent = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
-    ["catDialog", "confirmDialog", "syncDialog"].forEach(function (id) { wireDialog($(id)); });
+    ["catDialog", "confirmDialog", "syncDialog", "editDialog"].forEach(function (id) { wireDialog($(id)); });
 
     // transações
-    document.querySelectorAll(".toggle .btn").forEach(function (b) {
+    document.querySelectorAll("#form .toggle .btn").forEach(function (b) {
       b.addEventListener("click", function () { setType(b.getAttribute("data-type")); });
     });
     $("category").addEventListener("change", function (e) { formCategory = e.target.value; });
@@ -625,9 +684,16 @@
       toast("Transação adicionada");
     });
     $("transactions").addEventListener("click", function (e) {
+      var edit = e.target.closest("[data-edit]");
+      if (edit) { openEdit(edit.getAttribute("data-edit")); return; }
       var btn = e.target.closest("[data-del]");
       if (btn) deleteTransaction(btn.getAttribute("data-del"));
     });
+    document.querySelectorAll("#editForm .toggle .btn").forEach(function (b) {
+      b.addEventListener("click", function () { setEditType(b.getAttribute("data-etype")); });
+    });
+    $("editForm").addEventListener("submit", function (e) { e.preventDefault(); saveEdit(); });
+    $("eCancel").addEventListener("click", function () { $("editDialog").close(); editingId = null; });
     function onMonthClick(e) {
       var nav = e.target.closest("[data-nav]"), now = e.target.closest("[data-now]");
       if (!nav && !now) return;

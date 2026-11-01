@@ -84,7 +84,12 @@
     .finance-layout > div { min-width: 0; }
     .a-balance { grid-area: balance; } .a-form { grid-area: form; } .a-transactions { grid-area: transactions; } .a-chart { grid-area: chart; }
     @media (min-width: 768px) { .finance-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "balance balance" "form chart" "transactions transactions"; gap: 2rem; } }
-    @media (min-width: 1100px) { .finance-layout { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); grid-template-areas: "balance form" "transactions form" "transactions chart"; } }
+    .a-side { display: contents; }
+    @media (min-width: 1100px) {
+      .finance-layout { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); grid-template-areas: "balance side" "transactions side"; grid-template-rows: auto 1fr; }
+      /* No computador, formulário e gráfico formam uma coluna: o gráfico fica sempre logo abaixo do botão Adicionar. */
+      .a-side { display: flex; flex-direction: column; gap: 2rem; grid-area: side; min-width: 0; align-self: start; }
+    }
 
     /* saldo */
     .balance { border-radius: var(--radius); background: var(--balance); color: var(--balance-foreground); padding: 1.25rem; min-width: 0; }
@@ -112,8 +117,8 @@
     .btn.outline:hover { background: var(--accent); }
     .btn.danger { background: var(--destructive); color: var(--destructive-foreground); }
     .btn.danger:hover { background: color-mix(in oklab, var(--destructive) 90%, transparent); }
-    #addBtn { background: var(--balance); color: var(--balance-foreground); }
-    #addBtn:hover { background: color-mix(in oklab, var(--balance) 88%, black); }
+    #addBtn, #eSave { background: var(--balance); color: var(--balance-foreground); }
+    #addBtn:hover, #eSave:hover { background: color-mix(in oklab, var(--balance) 88%, black); }
     .btn.sm { height: 2rem; padding: 0 .75rem; font-size: .75rem; }
     .btn.icon { width: 2.25rem; padding: 0; }
     .btn.lg { height: 3rem; width: 100%; font-size: 1rem; }
@@ -151,8 +156,8 @@
     .empty { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 2.5rem 0; text-align: center; font-size: .875rem; color: var(--muted-foreground); }
     .empty.in { border-top: 0; }
     .tx-list > li + li { border-top: 1px solid var(--border); }
-    .tx { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 2.75rem; align-items: center; column-gap: .75rem; row-gap: .25rem; padding: 1rem 0; }
-    @media (min-width: 640px) { .tx { grid-template-columns: 2.5rem minmax(0, 1fr) auto 2.75rem; column-gap: 1rem; } }
+    .tx { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 5.5rem; align-items: center; column-gap: .75rem; row-gap: .25rem; padding: 1rem 0; }
+    @media (min-width: 640px) { .tx { grid-template-columns: 2.5rem minmax(0, 1fr) auto 5.5rem; column-gap: 1rem; } }
     .tx .ico { grid-column: 1; grid-row: 1; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .5rem; }
     .tx .ico svg { width: 1.25rem; height: 1.25rem; }
     .tx .ico.in { background: color-mix(in oklab, var(--success) 15%, transparent); color: var(--success); }
@@ -161,13 +166,13 @@
     .tx .info .d { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tx .info .m { font-size: .75rem; color: var(--muted-foreground); }
     .tx .amt { grid-column: 2; grid-row: 2; min-width: 0; font-size: .875rem; font-weight: 500; }
-    .tx .del { grid-column: 3; grid-row: 1 / span 2; }
-    @media (min-width: 640px) { .tx .amt { grid-column: 3; grid-row: 1; font-size: 1rem; } .tx .del { grid-column: 4; grid-row: 1; } }
+    .tx .acts { grid-column: 3; grid-row: 1 / span 2; display: flex; justify-content: flex-end; }
+    @media (min-width: 640px) { .tx .amt { grid-column: 3; grid-row: 1; font-size: 1rem; } .tx .acts { grid-column: 4; grid-row: 1; } }
 
     /* gráfico */
     .chart { border-top: 1px solid var(--border); padding-top: 1.25rem; min-width: 0; }
     @media (min-width: 768px) { .chart { border-top: 0; padding-top: 0; } }
-    @media (min-width: 1280px) { .chart { border-top: 1px solid var(--border); padding-top: 1.25rem; } }
+    @media (min-width: 1100px) { .chart { border-top: 1px solid var(--border); padding-top: 1.25rem; } }
     .chart .empty-c { display: grid; place-items: center; height: 12rem; font-size: .875rem; color: var(--muted-foreground); }
     .donut { position: relative; margin-top: 1rem; height: 12rem; }
     .donut svg { width: 100%; height: 100%; display: block; }
@@ -231,6 +236,7 @@
         <div class="a-balance"><section class="balance" id="balance" aria-label="Resumo financeiro"></section></div>
         <div class="a-transactions" id="transactions"></div>
 
+        <div class="a-side">
         <div class="a-form">
           <form id="form" novalidate>
             <h2>Nova transação</h2>
@@ -264,6 +270,7 @@
         </div>
 
         <div class="a-chart"><section class="chart" id="chart"></section></div>
+        </div>
       </main>
 
       <footer class="foot">
@@ -293,6 +300,40 @@
       <button type="button" class="btn outline" id="confirmCancel" style="flex:0 0 auto">Cancelar</button>
       <button type="button" class="btn danger" id="confirmOk" style="flex:0 0 auto"></button>
     </div>
+  </dialog>
+
+  <!-- Editar transação -->
+  <dialog id="editDialog">
+    <form id="editForm" novalidate>
+      <h2>Editar transação</h2>
+      <div class="toggle">
+        <button type="button" class="btn expense" data-etype="expense" aria-pressed="false"></button>
+        <button type="button" class="btn income" data-etype="income" aria-pressed="false"></button>
+      </div>
+      <div class="stack">
+        <div>
+          <label class="lbl" for="eAmount">Valor (R$)</label>
+          <input class="field mt15" id="eAmount" inputmode="decimal" placeholder="0,00" autocomplete="off" />
+        </div>
+        <div>
+          <label class="lbl" for="eCategory">Categoria</label>
+          <select class="field mt15" id="eCategory"></select>
+        </div>
+        <div>
+          <label class="lbl" for="eDate">Data</label>
+          <input class="field mt15" id="eDate" type="date" />
+        </div>
+        <div>
+          <label class="lbl" for="eDesc">Descrição</label>
+          <input class="field mt15" id="eDesc" autocomplete="off" />
+        </div>
+        <p class="err hidden" id="eErr" role="alert"></p>
+        <div class="btns">
+          <button type="button" class="btn outline tall" id="eCancel">Cancelar</button>
+          <button type="submit" class="btn tall" id="eSave">Salvar</button>
+        </div>
+      </div>
+    </form>
   </dialog>
 
   <!-- Sincronização -->
