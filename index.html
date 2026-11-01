@@ -221,6 +221,9 @@
     .cat-list li.std { padding: .75rem 0; }
     .cat-list li span:first-child { min-width: 0; overflow-wrap: break-word; }
     .cat-list .tag { font-size: .75rem; color: var(--muted-foreground); flex-shrink: 0; }
+    .sync-alert { display: block; width: 100%; margin: 0 0 1rem; padding: .75rem 1rem; border-radius: .5rem; border: 1px solid #ffc4c3; background: #ffeded; color: #a31513; font: inherit; font-size: .875rem; text-align: left; cursor: pointer; }
+    .toast.with-action { display: flex; align-items: center; justify-content: space-between; gap: .75rem; pointer-events: auto; }
+    .toast-act { flex: none; border: 0; background: none; font: inherit; font-weight: 700; color: inherit; text-decoration: underline; cursor: pointer; padding: .5rem .25rem; }
     #toasts { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: .5rem; align-items: center; width: calc(100% - 2rem); max-width: 22rem; pointer-events: none; }
     .toast { width: 100%; padding: .75rem 1rem; border-radius: .5rem; font-size: .875rem; border: 1px solid; box-shadow: 0 4px 12px rgb(0 0 0 / .12); }
     .toast.ok { background: #f2fbd9; color: #3d5200; border-color: #d8ee9b; }
@@ -240,6 +243,8 @@
         </div>
         <div class="date" id="today"></div>
       </header>
+
+      <button type="button" class="sync-alert hidden" id="syncAlert" role="alert"></button>
 
       <main class="finance-layout">
         <div class="a-balance"><section class="balance" id="balance" aria-label="Resumo financeiro"></section></div>

@@ -49,13 +49,22 @@
     return '<svg class="i ' + (cls || "") + '" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[name] + "</svg>";
   }
 
-  function toast(message, bad) {
+  function toast(message, bad, action) {
     var el = document.createElement("div");
     el.className = "toast " + (bad ? "bad" : "ok");
     el.setAttribute("role", bad ? "alert" : "status");
-    el.textContent = message;
+    var span = document.createElement("span");
+    span.textContent = message;
+    el.appendChild(span);
+    if (action) {
+      el.classList.add("with-action");
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.className = "toast-act"; btn.textContent = action.label;
+      btn.addEventListener("click", function () { el.remove(); action.run(); });
+      el.appendChild(btn);
+    }
     $("toasts").appendChild(el);
-    setTimeout(function () { el.remove(); }, 3500);
+    setTimeout(function () { el.remove(); }, action ? 7000 : 3500);
   }
 
   // ======================================================================
@@ -238,7 +247,7 @@
   // ======================================================================
   // Estado
   // ======================================================================
-  var state = { doc: emptyDoc(), config: null, status: "off", lastSync: null, error: null };
+  var state = { doc: emptyDoc(), config: null, status: "off", lastSync: null, error: null, tokenExp: null };
   var formType = "expense";
   var viewMonth = monthKey(new Date()); // mês exibido: cartão de saldo, lista e gráfico andam sempre juntos
   var formCategory = CATEGORIES.expense[0];
@@ -282,8 +291,19 @@
     }) }));
   }
   function deleteTransaction(id) {
+    var removed = state.doc.transactions.filter(function (t) { return t.id === id; })[0];
     var deleted = Object.assign({}, state.doc.deleted); deleted[id] = nowIso();
     changeDoc(Object.assign({}, state.doc, { transactions: state.doc.transactions.filter(function (t) { return t.id !== id; }), deleted: deleted }));
+    if (!removed) return;
+    // Desfazer: a transação volta com carimbo mais novo que a exclusão, então vence a exclusão na mesclagem entre aparelhos.
+    toast("Transação excluída", false, { label: "Desfazer", run: function () {
+      if (state.doc.transactions.some(function (t) { return t.id === id; })) return;
+      var back = Object.assign({}, removed, { updatedAt: nowIso() });
+      changeDoc(Object.assign({}, state.doc, { transactions: [back].concat(state.doc.transactions) }));
+      viewMonth = monthKey(new Date(back.date));
+      render();
+      toast("Transação restaurada");
+    } });
   }
   function addCategory(type, name) {
     var valid = validateCategoryName(type, name, state.doc.categories);
@@ -326,12 +346,24 @@
     return new TextDecoder().decode(bytes);
   }
 
+  // O GitHub informa a validade de tokens fine-grained no cabeçalho "github-authentication-token-expiration".
+  function noteTokenExpiry(res) {
+    try {
+      var raw = res.headers && res.headers.get("github-authentication-token-expiration");
+      var m = raw && /^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d) ?(UTC|[+-]\d{4})$/.exec(raw.trim());
+      if (!m) return;
+      var zone = m[3] === "UTC" ? "Z" : m[3].slice(0, 3) + ":" + m[3].slice(3);
+      var t = Date.parse(m[1] + "T" + m[2] + zone);
+      if (isFinite(t)) state.tokenExp = t;
+    } catch (e) { /* cabeçalho não disponível: sem aviso antecipado */ }
+  }
   function ghRequest(cfg, path, init) {
     init = init || {};
     var headers = { Accept: "application/vnd.github+json", Authorization: "Bearer " + cfg.token, "X-GitHub-Api-Version": "2022-11-28" };
     if (init.body) headers["Content-Type"] = "application/json";
     return fetch(API + path, { method: init.method || "GET", body: init.body, cache: "no-store", headers: headers })
-      .catch(function () { throw new SyncError("Sem conexão com o GitHub", "network"); });
+      .catch(function () { throw new SyncError("Sem conexão com o GitHub", "network"); })
+      .then(function (res) { noteTokenExpiry(res); return res; });
   }
   function failure(res) {
     if (res.status === 401) return new SyncError("Chave de acesso inválida ou expirada", "auth");
@@ -431,7 +463,7 @@
   function disconnect() {
     clearTimeout(timer);
     lsDel(KEYS.cfg);
-    setState({ config: null, status: "off", error: null, lastSync: null });
+    setState({ config: null, status: "off", error: null, lastSync: null, tokenExp: null });
   }
 
   function statusLabel() {
@@ -536,7 +568,20 @@
     }).join("") : '<li class="std"><span class="muted">Nenhuma categoria. Cadastre uma acima.</span></li>';
   }
 
+  function renderSyncAlert() {
+    var el = $("syncAlert"), msg = "";
+    if (state.config && state.status === "error") {
+      msg = (state.error || "Falha na sincronização") + ". Seus dados continuam salvos neste aparelho. Toque para resolver.";
+    } else if (state.config && state.tokenExp) {
+      var days = Math.ceil((state.tokenExp - Date.now()) / 86400000);
+      if (days <= 0) msg = "A chave de acesso expirou. Toque para colocar uma nova.";
+      else if (days <= 7) msg = "A chave de acesso expira em " + days + (days === 1 ? " dia" : " dias") + ". Gere uma nova e atualize em Sincronização. Toque para abrir.";
+    }
+    el.textContent = msg;
+    el.classList.toggle("hidden", !msg);
+  }
   function renderSync() {
+    renderSyncAlert();
     var on = !!state.config;
     var healthy = on && state.status !== "offline" && state.status !== "error";
     $("syncBtn").innerHTML = svg(state.status === "syncing" ? "refresh" : healthy ? "cloud" : "cloudOff", state.status === "syncing" ? "spin" : "") + "<span>" + esc(statusLabel()) + "</span>";
@@ -825,6 +870,7 @@
     });
 
     // sincronização
+    $("syncAlert").addEventListener("click", function () { $("syncBtn").click(); });
     $("syncBtn").addEventListener("click", function () { $("syncFormErr").classList.add("hidden"); renderSync(); openDialog($("syncDialog")); });
     $("syncClose").addEventListener("click", function () { $("syncDialog").close(); });
     $("syncNowBtn").addEventListener("click", function () { syncNow(); });
