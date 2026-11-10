@@ -1,11 +1,12 @@
 /* Service worker do Guig´s Bank (modo offline).
    Para publicar uma nova versão do app, aumente o número em CACHE_VERSION. */
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = 'guigs-bank-' + CACHE_VERSION;
 const APP_SHELL = [
   './',
   './index.html',
   './app.js',
+  './styles.css',
   './manifest.webmanifest',
   './favicon.png',
   './icons/icon-192.png',

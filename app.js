@@ -497,9 +497,9 @@
         '<button type="button" class="eye" id="eyeBtn" aria-pressed="' + (!balanceHidden) + '" aria-label="' + (balanceHidden ? "Mostrar saldo" : "Ocultar saldo") + '" title="' + (balanceHidden ? "Mostrar saldo" : "Ocultar saldo") + '">' + svg(balanceHidden ? "eye" : "eyeOff") + "</button></div>" +
       '<div class="stats">' +
         '<div class="stat"><div class="lbl" style="display:flex;align-items:center;gap:.5rem;color:var(--balance-muted)"><span class="inc" style="display:grid;place-items:center">' + svg("up") + "</span>Receitas</div>" +
-          '<div class="val tnum wrap-any">' + brl(income) + "</div></div>" +
+          '<div class="val tnum wrap-any">' + (balanceHidden ? "R$ ••••••" : brl(income)) + "</div></div>" +
         '<div class="stat"><div class="lbl" style="display:flex;align-items:center;gap:.5rem;color:var(--balance-muted)"><span class="exp" style="display:grid;place-items:center">' + svg("down") + "</span>Despesas</div>" +
-          '<div class="val tnum wrap-any">' + brl(expense) + "</div></div>" +
+          '<div class="val tnum wrap-any">' + (balanceHidden ? "R$ ••••••" : brl(expense)) + "</div></div>" +
       "</div>";
   }
 
