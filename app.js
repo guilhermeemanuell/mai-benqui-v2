@@ -38,6 +38,8 @@
     cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
     cloudOff: '<path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>',
     refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M9.9 4.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2"/><path d="M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><line x1="2" x2="22" y1="2" y2="22"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
     upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
     left: '<path d="m15 18-6-6 6-6"/>',
@@ -482,10 +484,17 @@
   // ======================================================================
   // Desenho da tela
   // ======================================================================
+  // O saldo sempre começa oculto ao abrir o app (não é salvo); o estado vale até recarregar.
+  var balanceHidden = true;
   function renderBalance(income, expense, month) {
+    var net = income - expense;
+    var phrase = net < 0 ? "Gaste menos, por favor." : "Se não comprar nada, o desconto é maior.";
+    $("tagline").textContent = phrase;
     $("balance").innerHTML =
       '<div class="lbl">' + svg("wallet") + "Saldo de " + esc(monthLabel(month)) + "</div>" +
-      '<div class="total tnum wrap-any">' + brl(income - expense) + "</div>" +
+      '<div class="sub">' + phrase + "</div>" +
+      '<div class="total-row"><div class="total tnum wrap-any">' + (balanceHidden ? "R$ ••••••" : brl(net)) + "</div>" +
+        '<button type="button" class="eye" id="eyeBtn" aria-pressed="' + (!balanceHidden) + '" aria-label="' + (balanceHidden ? "Mostrar saldo" : "Ocultar saldo") + '" title="' + (balanceHidden ? "Mostrar saldo" : "Ocultar saldo") + '">' + svg(balanceHidden ? "eye" : "eyeOff") + "</button></div>" +
       '<div class="stats">' +
         '<div class="stat"><div class="lbl" style="display:flex;align-items:center;gap:.5rem;color:var(--balance-muted)"><span class="inc" style="display:grid;place-items:center">' + svg("up") + "</span>Receitas</div>" +
           '<div class="val tnum wrap-any">' + brl(income) + "</div></div>" +
@@ -870,6 +879,11 @@
     });
 
     // sincronização
+    $("balance").addEventListener("click", function (e) {
+      if (!e.target.closest("#eyeBtn")) return;
+      balanceHidden = !balanceHidden;
+      render();
+    });
     $("syncAlert").addEventListener("click", function () { $("syncBtn").click(); });
     $("syncBtn").addEventListener("click", function () { $("syncFormErr").classList.add("hidden"); renderSync(); openDialog($("syncDialog")); });
     $("syncClose").addEventListener("click", function () { $("syncDialog").close(); });

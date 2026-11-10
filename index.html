@@ -95,6 +95,13 @@
     .balance { border-radius: var(--radius); background: var(--balance); color: var(--balance-foreground); padding: 1.25rem; min-width: 0; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
     @media (min-width: 640px) { .balance { padding: 2rem; } }
     .balance .lbl { display: flex; align-items: center; gap: .5rem; font-size: .875rem; color: var(--balance-muted); }
+    .balance .sub { display: block; margin-top: .25rem; font-size: .8125rem; color: var(--balance-muted); }
+    @media (min-width: 768px) { .balance .sub { display: none; } }
+    .balance .total-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .75rem; }
+    .balance .total-row .total { margin-top: 0; min-width: 0; }
+    .balance .eye { flex: none; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; border-radius: 999px; background: transparent; color: var(--balance-foreground); cursor: pointer; }
+    .balance .eye:hover { background: rgb(255 255 255 / .15); }
+    .balance .eye svg { width: 1.5rem; height: 1.5rem; }
     .balance .total { margin-top: .75rem; font-family: var(--font-display); font-size: 2rem; line-height: 1.2; font-weight: 500; }
     @media (min-width: 640px) { .balance .total { font-size: 3rem; line-height: 1; } }
     .balance .stats { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--balance-divider); }
@@ -238,7 +245,7 @@
           <img src="icons/icon-192.png" alt="Ícone do Guig´s Bank" width="56" height="56" />
           <div style="min-width:0">
             <h1>Guig´s Bank</h1>
-            <p>Gaste menos, por favor</p>
+            <p id="tagline">Gaste menos, por favor.</p>
           </div>
         </div>
         <div class="date" id="today"></div>
