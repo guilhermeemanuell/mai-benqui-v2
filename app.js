@@ -490,17 +490,22 @@
     var net = income - expense;
     var phrase = net < 0 ? "Gaste menos, por favor." : "Se não comprar nada, o desconto é maior.";
     $("tagline").textContent = phrase;
-    $("balance").innerHTML =
+    var mascot = net > 0
+      ? '<img class="balance-mascot positive" src="./images/saldo-positivo.webp" alt="" aria-hidden="true">'
+      : net < 0
+        ? '<img class="balance-mascot negative" src="./images/saldo-negativo.webp" alt="" aria-hidden="true">'
+        : "";
+    $("balance").innerHTML = mascot +
       '<div class="lbl">' + svg("wallet") + "Saldo de " + esc(monthLabel(month)) + "</div>" +
       '<div class="sub">' + phrase + "</div>" +
       '<div class="total-row"><div class="total tnum wrap-any">' + (balanceHidden ? "R$ ••••••" : brl(net)) + "</div>" +
         '<button type="button" class="eye" id="eyeBtn" aria-pressed="' + (!balanceHidden) + '" aria-label="' + (balanceHidden ? "Mostrar saldo" : "Ocultar saldo") + '" title="' + (balanceHidden ? "Mostrar saldo" : "Ocultar saldo") + '">' + svg(balanceHidden ? "eye" : "eyeOff") + "</button></div>" +
-      '<div class="stats">' +
+      '<div class="stats"><div class="stats-content">' +
         '<div class="stat"><div class="lbl" style="display:flex;align-items:center;gap:.5rem;color:var(--balance-muted)"><span class="inc" style="display:grid;place-items:center">' + svg("up") + "</span>Receitas</div>" +
           '<div class="val tnum wrap-any">' + (balanceHidden ? "R$ ••••••" : brl(income)) + "</div></div>" +
         '<div class="stat"><div class="lbl" style="display:flex;align-items:center;gap:.5rem;color:var(--balance-muted)"><span class="exp" style="display:grid;place-items:center">' + svg("down") + "</span>Despesas</div>" +
           '<div class="val tnum wrap-any">' + (balanceHidden ? "R$ ••••••" : brl(expense)) + "</div></div>" +
-      "</div>";
+      "</div></div>";
   }
 
   function renderList(all, bounds) {

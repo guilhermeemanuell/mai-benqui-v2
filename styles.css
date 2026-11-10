@@ -233,3 +233,57 @@
 .w-full { width: 100%; }
 
 .mt4 { margin-top: .25rem; }
+
+/* Mascotes decorativos: posicionamento ajustado conforme referência. */
+.balance { position: relative; overflow: hidden; isolation: isolate; }
+.balance > :not(.balance-mascot) { position: relative; z-index: 2; }
+.balance .balance-mascot {
+  position: absolute;
+  z-index: 1;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  object-position: right bottom;
+  pointer-events: none;
+  user-select: none;
+}
+.balance .balance-mascot.positive {
+  height: 70%;
+  right: -75px;
+  bottom: -10px;
+}
+.balance .balance-mascot.negative {
+  height: 90%;
+  right: -35px;
+  bottom: -50px;
+}
+
+/* A linha divisória ocupa toda a largura do cartão; somente o conteúdo interno pode ser reduzido. */
+.balance .stats {
+  display: block;
+  width: auto;
+}
+.balance .stats-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 639px) {
+  .balance .stats-content {
+    width: 240px;
+    max-width: 100%;
+    gap: .75rem;
+  }
+  .balance .balance-mascot.positive {
+    height: 50%;
+    right: -37px;
+    bottom: -10px;
+  }
+  .balance .balance-mascot.negative {
+    height: 80%;
+    right: -35px;
+    bottom: -45px;
+  }
+}
