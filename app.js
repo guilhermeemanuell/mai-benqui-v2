@@ -486,7 +486,13 @@
   // ======================================================================
   // O saldo sempre começa oculto ao abrir o app (não é salvo); o estado vale até recarregar.
   var balanceHidden = true;
+  var TRANSACTIONS_EXPANDED_KEY = "guigsbank.transactionsExpanded.v1";
   var transactionsExpanded = false;
+  try {
+    transactionsExpanded = sessionStorage.getItem(TRANSACTIONS_EXPANDED_KEY) === "1";
+  } catch (_) {
+    // Se o armazenamento da sessão estiver indisponível, mantém o estado em memória.
+  }
   function renderBalance(income, expense, month) {
     var net = income - expense;
     var phrase = net < 0 ? "Gaste menos, por favor." : "Se não comprar nada, o desconto é maior.";
@@ -832,7 +838,12 @@
       var expand = e.target.closest("[data-expand-transactions]");
       if (expand) {
         transactionsExpanded = !transactionsExpanded;
-        renderList(state.doc.transactions, monthBounds(state.doc.transactions));
+        try {
+          sessionStorage.setItem(TRANSACTIONS_EXPANDED_KEY, transactionsExpanded ? "1" : "0");
+        } catch (_) {
+          // O estado continua funcionando em memória se sessionStorage estiver bloqueado.
+        }
+        render();
         return;
       }
       var edit = e.target.closest("[data-edit]");
