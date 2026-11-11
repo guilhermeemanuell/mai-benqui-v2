@@ -514,8 +514,10 @@
       .sort(function (x, y) { return +new Date(y.date) - +new Date(x.date); });
     var html = '<section><div class="list-head"><h2>Transações recentes</h2><span>' + sorted.length + " no mês</span></div>" + monthNav("list", viewMonth, bounds);
     if (!sorted.length) { $("transactions").innerHTML = html + '<div class="empty in">Nenhuma transação em ' + monthLabel(viewMonth).toLocaleLowerCase("pt-BR") + ".</div></section>"; return; }
-    html += '<button type="button" class="tx-expand" data-expand-transactions aria-expanded="' + transactionsExpanded + '">' +
-      (transactionsExpanded ? "Recolher transações" : "Mostrar todas as transações (" + sorted.length + ")") + '</button>';
+    html += '<button type="button" class="tx-expand' + (transactionsExpanded ? ' is-expanded' : '') + '" data-expand-transactions aria-expanded="' + transactionsExpanded + '" aria-label="' +
+      (transactionsExpanded ? "Recolher transações" : "Mostrar todas as transações") + '" title="' +
+      (transactionsExpanded ? "Recolher transações" : "Mostrar todas as transações") + '">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9l7 7 7-7" /></svg></button>';
     if (!transactionsExpanded) { $("transactions").innerHTML = html + "</section>"; return; }
     html += '<ul class="tx-list">';
     sorted.forEach(function (tx) {

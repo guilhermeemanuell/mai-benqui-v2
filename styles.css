@@ -288,22 +288,49 @@
   }
 }
 
-/* Lista de transações recolhida por padrão. */
+/* Controle minimalista para expandir/recolher as transações. */
 .tx-expand {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  margin: .75rem 0;
-  padding: .7rem 1rem;
-  border: 1px solid var(--border, #dedee5);
-  border-radius:  .75rem;
+  min-height: 34px;
+  margin: .25rem 0 .5rem;
+  padding: .25rem;
+  border: 0;
+  border-radius: 0;
   background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 600;
+  color: oklch(0.75 0 0 / 1);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.tx-expand:hover {
-  background: rgb(127 127 127 / .08);
+.tx-expand svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-origin: center;
+  animation: tx-arrow-pulse 1.25s ease-in-out infinite;
+}
+.tx-expand.is-expanded svg {
+  transform: rotate(180deg);
+  animation: none;
+}
+.tx-expand:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+@keyframes tx-arrow-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx-expand svg { animation: none; }
 }
 @media (max-width: 767px) {
   .balance .sub {
