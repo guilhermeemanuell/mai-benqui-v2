@@ -850,7 +850,6 @@
       if (!nav && !now) return;
       // Qualquer um dos dois controles (lista ou gráfico) muda o mês de tudo.
       viewMonth = nav ? shiftMonth(viewMonth, +nav.getAttribute("data-dir")) : monthKey(new Date());
-      transactionsExpanded = false;
       collapseFormOnMobile(); // trocar de mês devolve o formulário ao modo compacto
       render();
     }

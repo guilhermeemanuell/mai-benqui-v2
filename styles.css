@@ -302,7 +302,7 @@
   background: transparent;
   color: oklch(0.75 0 0 / 1);
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: oklch(0.75 0 0 / 1);
 }
 .tx-expand svg {
   display: block;
