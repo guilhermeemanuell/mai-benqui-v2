@@ -486,6 +486,7 @@
   // ======================================================================
   // O saldo sempre começa oculto ao abrir o app (não é salvo); o estado vale até recarregar.
   var balanceHidden = true;
+  var transactionsExpanded = false;
   function renderBalance(income, expense, month) {
     var net = income - expense;
     var phrase = net < 0 ? "Gaste menos, por favor." : "Se não comprar nada, o desconto é maior.";
@@ -513,6 +514,9 @@
       .sort(function (x, y) { return +new Date(y.date) - +new Date(x.date); });
     var html = '<section><div class="list-head"><h2>Transações recentes</h2><span>' + sorted.length + " no mês</span></div>" + monthNav("list", viewMonth, bounds);
     if (!sorted.length) { $("transactions").innerHTML = html + '<div class="empty in">Nenhuma transação em ' + monthLabel(viewMonth).toLocaleLowerCase("pt-BR") + ".</div></section>"; return; }
+    html += '<button type="button" class="tx-expand" data-expand-transactions aria-expanded="' + transactionsExpanded + '">' +
+      (transactionsExpanded ? "Recolher transações" : "Mostrar todas as transações (" + sorted.length + ")") + '</button>';
+    if (!transactionsExpanded) { $("transactions").innerHTML = html + "</section>"; return; }
     html += '<ul class="tx-list">';
     sorted.forEach(function (tx) {
       var inc = tx.type === "income";
@@ -823,6 +827,12 @@
       toast("Transação adicionada");
     });
     $("transactions").addEventListener("click", function (e) {
+      var expand = e.target.closest("[data-expand-transactions]");
+      if (expand) {
+        transactionsExpanded = !transactionsExpanded;
+        renderList(state.doc.transactions, monthBounds(state.doc.transactions));
+        return;
+      }
       var edit = e.target.closest("[data-edit]");
       if (edit) { openEdit(edit.getAttribute("data-edit")); return; }
       var btn = e.target.closest("[data-del]");
@@ -838,6 +848,7 @@
       if (!nav && !now) return;
       // Qualquer um dos dois controles (lista ou gráfico) muda o mês de tudo.
       viewMonth = nav ? shiftMonth(viewMonth, +nav.getAttribute("data-dir")) : monthKey(new Date());
+      transactionsExpanded = false;
       collapseFormOnMobile(); // trocar de mês devolve o formulário ao modo compacto
       render();
     }

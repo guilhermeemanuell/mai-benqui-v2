@@ -287,3 +287,29 @@
     bottom: -45px;
   }
 }
+
+/* Lista de transações recolhida por padrão. */
+.tx-expand {
+  display: block;
+  width: 100%;
+  margin: .75rem 0;
+  padding: .7rem 1rem;
+  border: 1px solid var(--border, #dedee5);
+  border-radius:  .75rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tx-expand:hover {
+  background: rgb(127 127 127 / .08);
+}
+@media (max-width: 767px) {
+  .balance .sub {
+    font-size: 14px;
+  }
+  .balance .stats-content .lbl {
+    font-size: 14px;
+  }
+}
